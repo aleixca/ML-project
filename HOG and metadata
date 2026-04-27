@@ -310,4 +310,4 @@ def predict_new_image_with_metadata(image_path, age, sex, localization):
     return prediction
 
 
-predict_new_image("cat_or_dog.jpeg")
+predict_new_image_with_metadata("imagen_2026-04-27_192228171.png", 40, 0, 0)
