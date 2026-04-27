@@ -1,7 +1,9 @@
 import zipfile
 
-with zipfile.ZipFile("/content/archive.zip", 'r') as zip_ref:
-    zip_ref.extractall("/content/archive")
+zip_path = "/content/drive/MyDrive/dataset_images.zip"
+
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall("dataset")
 
 import os
 import cv2
@@ -14,12 +16,10 @@ from sklearn.metrics import accuracy_score
 
 from skimage.feature import hog
 
-train_path = "/content/archive/train/train"
-test_path = "/content/archive/test/test"
+train_path = "dataset/images/train"
+test_path = "dataset/images/test"
 
-# Extract csv file
-
-csv_path = "/content/archive/HAM10000_metadata.csv"  # change this if your csv has another name
+csv_path = "HAM10000_metadata.csv"
 
 df = pd.read_csv(csv_path)
 
