@@ -24,7 +24,7 @@ csv_path = "/content/archive/HAM10000_metadata.csv"  # change this if your csv h
 df = pd.read_csv(csv_path)
 
 def image_id(file):
-    return file
+    return return os.path.splitext(file)[0]
 
 metadata_dict = df.set_index("image_id").to_dict(orient="index")
 metadata = metadata_dict.get(image_id)
@@ -49,7 +49,7 @@ for label in ["cancerous", "non_cancerous"]:
         img = cv2.resize(img, (64,64))
 
         current_id = image_id(file)
-        metadata = metadata_dict.get(image_id)
+        metadata = metadata_dict.get(current_id)
 
         if metadata is None:
             continue
@@ -81,7 +81,7 @@ for label in ["cancerous", "non_cancerous"]:
         img = cv2.resize(img, (64,64))
 
         current_id = image_id(file)
-        metadata = metadata_dict.get(image_id)
+        metadata = metadata_dict.get(current_id)
 
         if metadata is None:
             continue
