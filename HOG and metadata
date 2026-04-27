@@ -1,0 +1,314 @@
+import zipfile
+
+with zipfile.ZipFile("/content/archive.zip", 'r') as zip_ref:
+    zip_ref.extractall("/content/archive")
+
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+from skimage.feature import hog
+
+train_path = "/content/archive/train/train"
+test_path = "/content/archive/test/test"
+
+# Extract csv file
+
+csv_path = "/content/archive/HAM10000_metadata.csv"  # change this if your csv has another name
+
+df = pd.read_csv(csv_path)
+
+def image_id(file):
+    return file
+
+metadata_dict = df.set_index("image_id").to_dict(orient="index")
+metadata = metadata_dict.get(image_id)
+
+
+images = []
+labels = []
+metadata_rows = []
+
+for label in ["cancerous", "non_cancerous"]:
+
+    folder = os.path.join(train_path, label)
+
+    for file in os.listdir(folder):
+
+        img_path = os.path.join(folder, file)
+
+        img = cv2.imread(img_path)
+
+        if img is None:
+            continue
+
+        img = cv2.resize(img, (64,64))
+
+        image_id = image_id(file)
+        metadata = metadata_dict.get(image_id)
+
+        if metadata is None:
+            continue
+
+        images.append(img)
+        labels.append(label)
+        metadata_rows.append(metadata)
+# ============================
+# Load test images
+# ============================
+
+images_test = []
+labels_test = []
+metadata_rows_test = []
+
+for label in ["cancerous", "non_cancerous"]:
+
+    folder = os.path.join(test_path, label)
+
+    for file in os.listdir(folder):
+
+        img_path = os.path.join(folder, file)
+
+        img = cv2.imread(img_path)
+
+        if img is None:
+            continue
+
+        img = cv2.resize(img, (64,64))
+
+        image_id = image_id(file)
+        metadata = metadata_dict.get(image_id)
+
+        if metadata is None:
+            continue
+
+        images_test.append(img)
+        labels_test.append(label)
+        metadata_rows_test.append(metadata)
+
+print("Training images:", len(images))
+print("Test images:", len(images_test))
+
+
+#convert data to numerical values
+
+metadata_train_df = pd.DataFrame(metadata_rows)
+metadata_test_df = pd.DataFrame(metadata_rows_test)
+
+selected_columns = ["age", "sex", "localization"]
+
+metadata_train_df = metadata_train_df[selected_columns]
+metadata_test_df = metadata_test_df[selected_columns]
+
+metadata_train_df["age"] = metadata_train_df["age"].fillna(metadata_train_df["age"].median())
+metadata_test_df["age"] = metadata_test_df["age"].fillna(metadata_train_df["age"].median())
+
+metadata_train_df["sex"] = metadata_train_df["sex"].fillna("unknown")
+metadata_test_df["sex"] = metadata_test_df["sex"].fillna("unknown")
+
+metadata_train_df["localization"] = metadata_train_df["localization"].fillna("unknown")
+metadata_test_df["localization"] = metadata_test_df["localization"].fillna("unknown")
+
+metadata_all = pd.concat([metadata_train_df, metadata_test_df], axis=0)
+
+metadata_all_encoded = pd.get_dummies(
+    metadata_all,
+    columns=["sex", "localization"]
+)
+
+X_metadata_train = metadata_all_encoded.iloc[:len(metadata_train_df)].values
+X_metadata_test = metadata_all_encoded.iloc[len(metadata_train_df):].values
+
+print(X_metadata_train.shape)
+print(X_metadata_test.shape)
+
+# ============================
+# Convert to grayscale
+# ============================
+
+images_gray = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in images]
+images_test_gray = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in images_test]
+
+
+# Visualize example
+plt.figure(figsize=(4,4))
+plt.imshow(images_gray[0], cmap="gray")
+plt.title(labels[0])
+plt.axis("off")
+plt.show()
+
+# ============================
+# Baseline model (raw pixels)
+# ============================
+
+X_train_pixels = np.array(images_gray).reshape(len(images_gray), -1)
+X_test_pixels = np.array(images_test_gray).reshape(len(images_test_gray), -1)
+
+rf_pixels = RandomForestClassifier(n_estimators=100, random_state=42)
+
+rf_pixels.fit(X_train_pixels, labels)
+
+y_pred_pixels_rf = rf_pixels.predict(X_test_pixels)
+
+accuracy_pixels_rf = accuracy_score(labels_test, y_pred_pixels_rf)
+
+print("Accuracy with raw pixels (Random Forest):", accuracy_pixels_rf)
+
+
+# ============================
+# Extract HOG features
+# ============================
+
+hog_train = []
+
+for img in images_gray:
+
+    features = hog(
+        img,
+        pixels_per_cell=(8,8),
+        cells_per_block=(2,2),
+        feature_vector=True
+    )
+
+    hog_train.append(features)
+
+hog_train = np.array(hog_train)
+
+
+hog_test = []
+
+for img in images_test_gray:
+
+    features = hog(
+        img,
+        pixels_per_cell=(8,8),
+        cells_per_block=(2,2),
+        feature_vector=True
+    )
+
+    hog_test.append(features)
+
+hog_test = np.array(hog_test)
+
+X_train_combined = np.concatenate([hog_train, X_metadata_train], axis=1)
+X_test_combined = np.concatenate([hog_test, X_metadata_test], axis=1)
+
+print("HOG train shape:", hog_train.shape)
+print("Metadata train shape:", X_metadata_train.shape)
+print("Combined train shape:", X_train_combined.shape)
+
+# ============================
+# Visualize HOG representation
+# ============================
+
+features, hog_image = hog(
+    images_gray[0],
+    pixels_per_cell=(8,8),
+    cells_per_block=(2,2),
+    visualize=True
+)
+
+plt.figure(figsize=(8,4))
+
+plt.subplot(1,2,1)
+plt.imshow(images_gray[0], cmap="gray")
+plt.title("Original")
+
+plt.subplot(1,2,2)
+plt.imshow(hog_image, cmap="gray")
+plt.title("HOG representation")
+
+plt.show()
+
+
+#train random forest
+
+rf_hog_metadata = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42,
+    class_weight="balanced"
+)
+
+rf_hog_metadata.fit(X_train_combined, labels)
+
+y_pred_hog_metadata = rf_hog_metadata.predict(X_test_combined)
+
+accuracy_hog_metadata = accuracy_score(labels_test, y_pred_hog_metadata)
+
+print("Accuracy with HOG + metadata:", accuracy_hog_metadata)
+
+# ============================
+# Final comparison
+# ============================
+
+print("\nComparison:")
+print("Raw pixels accuracy:", accuracy_pixels_rf)
+print("HOG features accuracy:", accuracy_hog_rf)
+
+def predict_new_image_with_metadata(image_path, age, sex, localization):
+
+    img = cv2.imread(image_path)
+
+    if img is None:
+        raise ValueError("Image could not be loaded")
+
+    img = cv2.resize(img, (64,64))
+    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    features = hog(
+        img_gray,
+        pixels_per_cell=(8,8),
+        cells_per_block=(2,2),
+        feature_vector=True
+    )
+
+    new_metadata = pd.DataFrame([{
+        "age": age,
+        "sex": sex,
+        "localization": localization
+    }])
+
+    new_metadata_encoded = pd.get_dummies(
+        new_metadata,
+        columns=["sex", "localization"]
+    )
+
+    new_metadata_encoded = new_metadata_encoded.reindex(
+        columns=metadata_all_encoded.columns,
+        fill_value=0
+    )
+
+    combined_features = np.concatenate(
+        [features.reshape(1, -1), new_metadata_encoded.values],
+        axis=1
+    )
+
+    prediction = rf_hog_metadata.predict(combined_features)[0]
+
+    plt.figure(figsize=(4,4))
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.title(f"Prediction: {prediction}")
+    plt.axis("off")
+    plt.show()
+
+    return prediction
+
+    # Predict
+    prediction = rf_hog.predict([features])[0]
+
+    # Show image
+    plt.figure(figsize=(4,4))
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.title(f"Prediction: {prediction}")
+    plt.axis("off")
+    plt.show()
+
+    return prediction
+
+
+predict_new_image("cat_or_dog.jpeg")
