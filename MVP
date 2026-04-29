@@ -61,6 +61,8 @@ for label in ["cancerous", "non_cancerous"]:
         labels.append(label)
         metadata_rows.append(metadata)
 
+#<------------------------------------------------------->
+
 # ============================
 # Load test images
 # ============================
@@ -145,6 +147,8 @@ plt.title(labels[0])
 plt.axis("off")
 plt.show()
 
+#<------------------------------------------------------->
+
 # ============================
 # Baseline model (raw pixels)
 # ============================
@@ -161,6 +165,8 @@ y_pred_pixels_rf = rf_pixels.predict(X_test_pixels)
 accuracy_pixels_rf = accuracy_score(labels_test, y_pred_pixels_rf)
 
 print("Accuracy with raw pixels (Random Forest):", accuracy_pixels_rf)
+
+#<------------------------------------------------------->
 
 # ============================
 # Extract HOG features
@@ -210,6 +216,8 @@ plt.title("HOG representation")
 plt.axis("off")
 
 plt.show()
+
+#<------------------------------------------------------->
 
 #train random forest
 
@@ -295,12 +303,16 @@ def predict_new_image_with_metadata(image_path, age, sex, localization):
 
     return prediction
 
+#<------------------------------------------------------->
+
 from sklearn.metrics import classification_report, confusion_matrix
 print("HOG + metadata diagnostics")
 print(classification_report(labels_test, y_pred_hog_metadata))
 print("\n\n")
 print("Raw Pixels diagnostics")
 print(classification_report(labels_test, y_pred_pixels_rf))
+
+#<------------------------------------------------------->
 
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
@@ -312,12 +324,16 @@ plt.ylabel('Actual')
 plt.xlabel('Predicted')
 plt.show()
 
+#<------------------------------------------------------->
+
 from sklearn.metrics import roc_curve, precision_recall_curve
 y_probs = rf_hog_metadata.predict_proba(X_test_combined)[:, 0] 
 
 fpr, tpr, thresholds_roc = roc_curve(labels_test, y_probs, pos_label='cancerous')
 
 precision, recall, thresholds_pr = precision_recall_curve(labels_test, y_probs, pos_label='cancerous')
+
+#<------------------------------------------------------->
 
 import numpy as np
 j_scores = tpr - fpr
@@ -326,11 +342,15 @@ best_threshold = thresholds_roc[best_idx]
 
 print(f"El llindar òptim segons Youden és: {best_threshold}")
 
+#<------------------------------------------------------->
+
 target_recall = 0.80
 idx_target = np.where(recall >= target_recall)[0][-1]
 threshold_for_80_recall = thresholds_pr[idx_target]
 
 print(f"Per tenir un 80% de recall, el llindar ha de ser: {threshold_for_80_recall}")
+
+#<------------------------------------------------------->
 
 y_probs = rf_hog_metadata.predict_proba(X_test_combined)[:, 0] 
 
@@ -352,6 +372,8 @@ plt.title(f"Confusion Matrix (Threshold: {threshold})")
 plt.ylabel('Actual')
 plt.xlabel('Predicció')
 plt.show()
+
+#<------------------------------------------------------->
 
 from sklearn.metrics import precision_recall_curve, roc_curve
 
@@ -389,6 +411,8 @@ plt.grid(alpha=0.3)
 
 plt.tight_layout()
 plt.show()
+
+#<------------------------------------------------------->
 
 def predict_new_image_with_metadata(image_path, age, sex, localization):
     img = cv2.imread(image_path)
