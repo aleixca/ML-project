@@ -221,6 +221,9 @@ plt.show()
 
 #train random forest
 
+X_train_combined = np.concatenate([hog_train, X_metadata_train], axis=1)
+X_test_combined = np.concatenate([hog_test, X_metadata_test], axis=1)
+
 rf_hog_metadata = RandomForestClassifier(
     n_estimators=200,
     random_state=42,
